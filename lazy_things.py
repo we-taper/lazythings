@@ -15,25 +15,29 @@ _LAZY_NUMBER_LIKE = Union['LazyAtom', Number, Callable]
 
 class LazyAtom:
     def __init__(self, value):
-        self._value = value
-        self._func_list = []
+        if callable(value):
+            self._func = value
+            self._root = False
+        else:
+            self._func= lambda: value
+            self._root = True
+
+    @property
+    def root(self) -> bool:
+        return self._root
 
     def __radd__(self, other):
         def wrapped_radd():
-            self._value = other + self._value
-        self._func_list.append(wrapped_radd)
-        return self
+            return other + self.execute()
+        return LazyAtom(wrapped_radd)
 
     def __add__(self, other):
         def wrapped_add():
-            self._value = self._value + other
-        self._func_list.append(wrapped_add)
-        return self
+            return self.execute() + other
+        return LazyAtom(wrapped_add)
 
     def execute(self):
-        [f() for f in self._func_list]
-        self._func_list = []
-        return self._value
+        return self._func()
 
 #
 # class LazyAtom:
