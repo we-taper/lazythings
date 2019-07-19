@@ -1,53 +1,64 @@
-import operator as _op
-from functools import partialmethod, reduce
-from itertools import count
 from numbers import Number
-from typing import Callable, Union, List, Optional, SupportsFloat
+from typing import Callable, Union
 
-import numpy as np
+__all__ = ['Node']
 
-
-__all__ = ['LazyAtom']
-
-
-_LAZY_NUMBER_LIKE = Union['LazyAtom', Number, Callable]
+_LAZY_NUMBER_LIKE = Union['Node', Number, Callable]
 
 
-class LazyAtom:
-    def __init__(self, value):
+class Node:
+    def __init__(self, value, parent=None):
         if callable(value):
             self._func = value
             self._root = False
+            self._parent = parent
         else:
-            self._func= lambda: value
+            self._func = lambda: value
             self._root = True
+            if parent is not None:
+                raise ValueError(f'Parent should be None for root node.')
+            self._parent = value
 
     @property
     def root(self) -> bool:
         return self._root
 
+    @property
+    def parent(self):
+        return self._parent
+
+    @property
+    def func_name(self):
+        return self._func.__name__
+
+    @property
+    def func(self):
+        return self._func
+
     def __radd__(self, other):
         def wrapped_radd():
             return other + self.execute()
-        return LazyAtom(wrapped_radd)
+
+        return Node(wrapped_radd, parent=self)
 
     def __add__(self, other):
         def wrapped_add():
             return self.execute() + other
-        return LazyAtom(wrapped_add)
+
+        return Node(wrapped_add, parent=self)
 
     def execute(self):
         return self._func()
 
 #
-# class LazyAtom:
+# class Node:
 #     """A constant, calculation on me is not evaluated until executed."""
 #     _counter = count(0)
 #
 #     def __init__(self, value: _LAZY_NUMBER_LIKE):
-#         self._id = next(LazyAtom._counter)
+#         self._id = next(Node._counter)
 #
-#         if isinstance(value, LazyAtom):
+#         if isinstance(value, Node):
 #             assert length is None, f"We should not use length here"  # TODO(hx)
 #             # maintain the same len
 #             self._length = value._length
@@ -127,7 +138,7 @@ class LazyAtom:
 #
 #         def wrapper():
 #             a = this.execute()
-#             if isinstance(other, LazyAtom):
+#             if isinstance(other, Node):
 #                 b = other()
 #             else:
 #                 b = np.asarray(other)
@@ -136,7 +147,7 @@ class LazyAtom:
 #             else:
 #                 return op(a, b)
 #
-#         return LazyAtom(wrapper, length=this.length)
+#         return Node(wrapper, length=this.length)
 #
 #     __add__ = partialmethod(_get_value_binary_op, op=_op.add, reverse=False)
 #     __radd__ = partialmethod(_get_value_binary_op, op=_op.add, reverse=True)
@@ -156,13 +167,13 @@ class LazyAtom:
 #             a = self.execute()
 #             return a ** power
 #
-#         return LazyAtom(wrapper, length=self._length)
+#         return Node(wrapper, length=self._length)
 #
 #     def __neg__(self):
 #         def neg():
 #             return - self.execute()
 #
-#         return LazyAtom(neg, self._length)
+#         return Node(neg, self._length)
 #
 #     def __getitem__(self, item):
 #         assert isinstance(item, int), 'Not supported yet.'  # todo: hx
@@ -175,7 +186,7 @@ class LazyAtom:
 #             a = self.execute()
 #             return a[item]
 #
-#         return LazyAtom(_getitem, length=1)
+#         return Node(_getitem, length=1)
 #
 #     def __len__(self):
 #         if self._length is None:
@@ -208,13 +219,13 @@ class LazyAtom:
 #         raise NotImplementedError(type(str(self)))
 #
 #
-# class StackedLazyVariable(LazyAtom):
+# class StackedLazyVariable(Node):
 #     def __init__(
 #             self,
-#             vars: List[LazyAtom]
+#             vars: List[Node]
 #     ):
 #         self._value_list = [
-#             v if isinstance(v, LazyAtom) else LazyAtom(v)
+#             v if isinstance(v, Node) else Node(v)
 #             for v in vars
 #         ]
 #         super(StackedLazyVariable, self).__init__(
